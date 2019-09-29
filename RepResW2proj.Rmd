@@ -1,0 +1,124 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: html_document
+date: September 2019
+keep_md: true
+---
+
+
+## Loading and preprocessing the data
+```{r message=FALSE}
+library(dplyr)
+```
+
+```{r echo=TRUE}
+activity=read.csv("activity.csv")
+
+```
+
+
+## What is mean total number of steps taken per day?
+```{r}
+totalstep<-tapply(activity$steps, activity$date, sum, na.rm=TRUE)
+
+hist(totalstep, xlab="total number of steps per day", 
+main="Histogram",ylim=c(0,40))
+
+summary(totalstep)
+options(scipen = 999)
+options(digits=0)
+meanTotStep<-summary(totalstep)[4]
+medianTotStep<-summary(totalstep)[3]
+```  
+The mean of the total number of steps taken per day is 
+`r meanTotStep`.  
+
+The median of the total number of steps taken per day is 
+`r medianTotStep`.
+
+
+## What is the average daily activity pattern?
+```{r}
+intervalstep<-tapply(activity$steps, as.factor(activity$interval),
+mean,na.rm=TRUE)
+
+plot(row.names(intervalstep), intervalstep, type="l", 
+xlab="5-minute interval", ylab="average number of steps",
+main="Average Daily Activity Pattern")
+
+intervalMax<-row.names(intervalstep)[which(intervalstep==max(intervalstep))]
+```  
+Interval `r intervalMax` contains the maximum number of steps.  
+
+## Imputing missing values
+```{r}
+missingValue<-sum(is.na(activity$steps))
+```  
+The total number of missing values in the dataset is `r missingValue`.  
+
+```{r}
+#Place the average number of step in each 5-minute interval across all days in a dataframe
+
+df<-data.frame(interval=row.names(intervalstep), intervalstep)
+
+#subset the activity dataset into two sets, one contains #all the NA rows, the other contains all the non-NA rows
+
+NAset<-subset(activity, is.na(activity$steps)) 
+rmNAset<-subset(activity, !is.na(activity$steps))
+
+#replace the NA values by the average number of step in #each 5-minute interval from dataframe df
+
+NAset$steps<-df$intervalstep[match(NAset$interval, df$interval)]
+
+#recombine the NAset with NA replaced and the non-NA set, #and sort by date 
+
+activity2<-arrange(rbind(NAset, rmNAset),date)
+
+totalstep2<-tapply(activity2$steps, activity2$date, sum)
+hist(totalstep2, ylim=c(0,40),xlab="total number of steps per day", main="Histogram (NA replaced by interval averages)")
+
+summary(totalstep2)
+
+meanTotStep2<-summary(totalstep2)[4]
+medianTotStep2<-summary(totalstep2)[3]
+```  
+The mean of the total number of steps taken per day is 
+`r meanTotStep2`.  
+
+The median of the total number of steps taken per day is 
+`r medianTotStep2`.  
+
+The medians of the two datasets are similar; the mean is higher in the dataset with NA values replaced with the average number of step of corresponding intervals.  This makes sense because inputting values to replace NAs will push the mean up, compared to removing NAs. And most the NAs seem to occur in the 0-5000 and 10000-15000 ranges.  
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+
+#find out the which day of the week
+
+#find out the which day of the week
+activity2$day<-weekdays(as.Date(activity2$date,format="%Y-%m-%d"))
+
+#assign weekend and weekday based on the day of the week
+activity2$day[grep("Saturday|Sunday",activity2$day)]<-"weekend"
+activity2$day[!grepl("weekend", activity2$day)]<-"weekday"
+
+activity2$day<-as.factor(activity2$day)
+
+intervalstep2<-with(activity2,tapply(steps, list(interval,day), mean))
+
+df2<-data.frame(interval=row.names(intervalstep2),
+meanSteps=intervalstep2[,1], day=rep("weekday", nrow(intervalstep2)))
+
+df3<-data.frame(interval=row.names(intervalstep2),
+meanSteps=intervalstep2[,2], day=rep("weekend", nrow(intervalstep2)))
+
+final<-rbind(df2,df3)
+final$interval<-as.numeric(as.character(final$interval))
+
+library(lattice)
+
+xyplot(meanSteps~interval | day, data=final, type="l", layout=c(1,2))
+```    
+
+Acitivty patterns between weekend and weekdays have some differences. For example, the average numbers of steps are higher during intervals 800-1000 on the weekdays, compared to the same intervals on the weekends.  The average number of steps are higher between intervals 1200-2000 on the weekends, compared to those of the same intervals on the weekdays. During the weekends, the average of number of steps across intervals 800-2000 are rather similar. But the average numbers of step are much higher between 800-1000 intervals than the other intervals during the weekdays.    
